@@ -5,6 +5,8 @@ const dotenv = require("dotenv");
 const http = require("http");
 const { Server } = require("socket.io");
 
+dotenv.config();
+
 const authRoutes = require("./routes/auth");
 const userRoutes = require("./routes/users");
 const messageRoutes = require("./routes/message");
@@ -12,8 +14,6 @@ const messageRoutes = require("./routes/message");
 const User = require("./models/User");
 const Message = require("./models/Message");
 const authMiddleware = require("./middleware/authMiddleware");
-
-dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
@@ -24,8 +24,6 @@ const server = http.createServer(app);
 
 const onlineUsers = new Map();
 
-// userId -> socketId
-
 // ======================================================
 // ALLOWED FRONTEND ORIGINS
 // ======================================================
@@ -35,6 +33,46 @@ const allowedOrigins = [
   "http://localhost:5174",
   "https://chatflow-frontend-8vu3.onrender.com",
 ];
+
+// ======================================================
+// CORS OPTIONS
+// ======================================================
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests without an origin
+    // (Postman, server-to-server, etc.)
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    console.log("Blocked CORS origin:", origin);
+
+    return callback(
+      new Error("Not allowed by CORS")
+    );
+  },
+
+  credentials: true,
+
+  methods: [
+    "GET",
+    "POST",
+    "PUT",
+    "PATCH",
+    "DELETE",
+    "OPTIONS",
+  ],
+
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+  ],
+};
 
 // ======================================================
 // SOCKET.IO
@@ -52,22 +90,25 @@ const io = new Server(server, {
 // MIDDLEWARE
 // ======================================================
 
-app.use(
-  cors({
-    origin: allowedOrigins,
-    credentials: true,
-  })
-);
+app.use(cors(corsOptions));
 
 app.use(express.json());
 
 // ======================================================
-// TEST
+// HEALTH / TEST
 // ======================================================
 
 app.get("/", (req, res) => {
-  res.json({
+  res.status(200).json({
+    success: true,
     message: "ChatFlow server is running",
+  });
+});
+
+app.get("/health", (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "ChatFlow server healthy",
   });
 });
 
@@ -110,14 +151,14 @@ app.get(
 
       return res.status(200).json({
         user: {
-          id: user._id,
+          id: String(user._id),
           name: user.name,
           email: user.email,
         },
       });
     } catch (error) {
       console.error(
-        "Profile error:",
+        "❌ Profile error:",
         error
       );
 
@@ -145,26 +186,33 @@ io.on("connection", (socket) => {
   socket.on(
     "user_online",
     (userId) => {
-      if (!userId) return;
+      try {
+        if (!userId) return;
 
-      const id = String(userId);
+        const id = String(userId);
 
-      onlineUsers.set(
-        id,
-        socket.id
-      );
+        onlineUsers.set(
+          id,
+          socket.id
+        );
 
-      console.log(
-        "🟢 User online:",
-        id
-      );
+        console.log(
+          "🟢 User online:",
+          id
+        );
 
-      io.emit(
-        "online_users",
-        Array.from(
-          onlineUsers.keys()
-        )
-      );
+        io.emit(
+          "online_users",
+          Array.from(
+            onlineUsers.keys()
+          )
+        );
+      } catch (error) {
+        console.error(
+          "❌ User online error:",
+          error
+        );
+      }
     }
   );
 
@@ -175,28 +223,35 @@ io.on("connection", (socket) => {
   socket.on(
     "user_offline",
     (userId) => {
-      if (!userId) return;
+      try {
+        if (!userId) return;
 
-      const id = String(userId);
+        const id = String(userId);
 
-      if (
-        onlineUsers.get(id) ===
-        socket.id
-      ) {
-        onlineUsers.delete(id);
+        if (
+          onlineUsers.get(id) ===
+          socket.id
+        ) {
+          onlineUsers.delete(id);
+        }
+
+        io.emit(
+          "online_users",
+          Array.from(
+            onlineUsers.keys()
+          )
+        );
+
+        console.log(
+          "🔴 User offline:",
+          id
+        );
+      } catch (error) {
+        console.error(
+          "❌ User offline error:",
+          error
+        );
       }
-
-      io.emit(
-        "online_users",
-        Array.from(
-          onlineUsers.keys()
-        )
-      );
-
-      console.log(
-        "🔴 User offline:",
-        id
-      );
     }
   );
 
@@ -208,6 +263,8 @@ io.on("connection", (socket) => {
     "send_message",
     async (data) => {
       try {
+        if (!data) return;
+
         const {
           sender,
           receiver,
@@ -218,17 +275,20 @@ io.on("connection", (socket) => {
           !sender ||
           !receiver ||
           !message ||
-          !message.trim()
+          !String(message).trim()
         ) {
           return;
         }
 
+        // ----------------------------------------------
+        // SAVE MESSAGE
+        // ----------------------------------------------
+
         const newMessage =
           await Message.create({
-            sender,
-            receiver,
-            message:
-              message.trim(),
+            sender: String(sender),
+            receiver: String(receiver),
+            message: String(message).trim(),
             seen: false,
           });
 
@@ -236,6 +296,10 @@ io.on("connection", (socket) => {
           "💬 Message saved:",
           newMessage._id.toString()
         );
+
+        // ----------------------------------------------
+        // SEND TO CONNECTED CLIENTS
+        // ----------------------------------------------
 
         io.emit(
           "receive_message",
@@ -258,6 +322,8 @@ io.on("connection", (socket) => {
     "mark_message_seen",
     async (data) => {
       try {
+        if (!data) return;
+
         const {
           messageId,
           receiver,
@@ -274,7 +340,7 @@ io.on("connection", (socket) => {
           await Message.findOneAndUpdate(
             {
               _id: messageId,
-              receiver: receiver,
+              receiver: String(receiver),
               seen: false,
             },
             {
@@ -299,20 +365,17 @@ io.on("connection", (socket) => {
         io.emit(
           "message_seen",
           {
-            messageId:
-              String(
-                updatedMessage._id
-              ),
+            messageId: String(
+              updatedMessage._id
+            ),
 
-            sender:
-              String(
-                updatedMessage.sender
-              ),
+            sender: String(
+              updatedMessage.sender
+            ),
 
-            receiver:
-              String(
-                updatedMessage.receiver
-              ),
+            receiver: String(
+              updatedMessage.receiver
+            ),
           }
         );
       } catch (error) {
@@ -332,6 +395,8 @@ io.on("connection", (socket) => {
     "mark_all_messages_seen",
     async (data) => {
       try {
+        if (!data) return;
+
         const {
           sender,
           receiver,
@@ -347,8 +412,8 @@ io.on("connection", (socket) => {
         const result =
           await Message.updateMany(
             {
-              sender: sender,
-              receiver: receiver,
+              sender: String(sender),
+              receiver: String(receiver),
               seen: false,
             },
             {
@@ -366,11 +431,8 @@ io.on("connection", (socket) => {
         io.emit(
           "all_messages_seen",
           {
-            sender:
-              String(sender),
-
-            receiver:
-              String(receiver),
+            sender: String(sender),
+            receiver: String(receiver),
           }
         );
       } catch (error) {
@@ -463,8 +525,7 @@ io.on("connection", (socket) => {
   socket.on(
     "disconnect",
     () => {
-      let disconnectedUser =
-        null;
+      let disconnectedUser = null;
 
       for (
         const [
@@ -511,27 +572,60 @@ io.on("connection", (socket) => {
 const PORT =
   process.env.PORT || 5000;
 
+if (!process.env.MONGO_URI) {
+  console.error(
+    "❌ MONGO_URI is missing in environment variables"
+  );
+
+  process.exit(1);
+}
+
 mongoose
-  .connect(
-    process.env.MONGO_URI
-  )
+  .connect(process.env.MONGO_URI)
   .then(() => {
     console.log(
-      "MongoDB connected successfully"
+      "✅ MongoDB connected successfully"
     );
 
     server.listen(
       PORT,
+      "0.0.0.0",
       () => {
         console.log(
-          `Server running on port ${PORT}`
+          `🚀 ChatFlow server running on port ${PORT}`
         );
       }
     );
   })
   .catch((error) => {
     console.error(
-      "MongoDB connection failed:",
+      "❌ MongoDB connection failed:",
       error
     );
+
+    process.exit(1);
   });
+
+// ======================================================
+// GLOBAL ERROR HANDLER
+// ======================================================
+
+process.on(
+  "unhandledRejection",
+  (error) => {
+    console.error(
+      "❌ Unhandled rejection:",
+      error
+    );
+  }
+);
+
+process.on(
+  "uncaughtException",
+  (error) => {
+    console.error(
+      "❌ Uncaught exception:",
+      error
+    );
+  }
+);
