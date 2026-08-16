@@ -1,16 +1,21 @@
-
 import { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import "./App.css";
 
-const socket = io("https://chatflow-server-xpor.onrender.com", {
+// =====================================================
+// LIVE BACKEND
+// =====================================================
+
+const SERVER_URL = "https://chatflow-server-xpor.onrender.com";
+
+const socket = io(SERVER_URL, {
   autoConnect: true,
   transports: ["websocket", "polling"],
 });
 
 function App() {
   // =====================================================
-  // AUTH STATE
+  // AUTH
   // =====================================================
 
   const [isLogin, setIsLogin] = useState(true);
@@ -20,7 +25,7 @@ function App() {
   );
 
   // =====================================================
-  // USER STATE
+  // USER
   // =====================================================
 
   const [currentUser, setCurrentUser] = useState(null);
@@ -28,7 +33,7 @@ function App() {
   const [selectedUser, setSelectedUser] = useState(null);
 
   // =====================================================
-  // ONLINE USERS
+  // ONLINE
   // =====================================================
 
   const [onlineUsers, setOnlineUsers] = useState([]);
@@ -42,21 +47,21 @@ function App() {
   const [password, setPassword] = useState("");
 
   // =====================================================
-  // MESSAGE STATE
+  // MESSAGE
   // =====================================================
 
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
 
   // =====================================================
-  // UI STATE
+  // UI
   // =====================================================
 
   const [connected, setConnected] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
 
   // =====================================================
-  // UNREAD MESSAGE COUNT
+  // UNREAD
   // =====================================================
 
   const [unreadCounts, setUnreadCounts] = useState({});
@@ -81,7 +86,7 @@ function App() {
       if (!token) return;
 
       const response = await fetch(
-        "https://chatflow-server-xpor.onrender.com//api/profile",
+        `${SERVER_URL}/api/profile`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -112,17 +117,16 @@ function App() {
       setCurrentUser(user);
       currentUserRef.current = user;
 
-      socket.emit("user_online", user.id);
+      if (socket.connected) {
+        socket.emit("user_online", user.id);
+      }
     } catch (error) {
-      console.error(
-        "Profile error:",
-        error
-      );
+      console.error("Profile error:", error);
     }
   };
 
   // =====================================================
-  // LOAD ALL USERS
+  // LOAD USERS
   // =====================================================
 
   const loadUsers = async () => {
@@ -132,7 +136,7 @@ function App() {
       if (!token) return;
 
       const response = await fetch(
-        "https://chatflow-server-xpor.onrender.com/api/users",
+        `${SERVER_URL}/api/users`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -160,10 +164,7 @@ function App() {
 
       setUsers(formattedUsers);
     } catch (error) {
-      console.error(
-        "Users error:",
-        error
-      );
+      console.error("Users error:", error);
     }
   };
 
@@ -175,8 +176,8 @@ function App() {
     e.preventDefault();
 
     const url = isLogin
-      ? "https://chatflow-server-xpor.onrender.com/api/auth/login"
-      : "https://chatflow-server-xpor.onrender.com/api/auth/register";
+      ? `${SERVER_URL}/api/auth/login`
+      : `${SERVER_URL}/api/auth/register`;
 
     const body = isLogin
       ? {
@@ -190,16 +191,13 @@ function App() {
         };
 
     try {
-      const response = await fetch(
-        url,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(body),
-        }
-      );
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
 
       const data = await response.json();
 
@@ -236,17 +234,18 @@ function App() {
           setCurrentUser(user);
           currentUserRef.current = user;
 
-          socket.emit(
-            "user_online",
-            user.id
-          );
+          if (socket.connected) {
+            socket.emit(
+              "user_online",
+              user.id
+            );
+          }
         }
 
         setLoggedIn(true);
-
         setPassword("");
 
-        loadUsers();
+        await loadUsers();
       } else {
         // =================================================
         // REGISTER SUCCESS
@@ -273,7 +272,7 @@ function App() {
   };
 
   // =====================================================
-  // MARK ALL MESSAGES AS SEEN
+  // MARK ALL SEEN
   // =====================================================
 
   const markAllMessagesSeen = (
@@ -294,24 +293,21 @@ function App() {
   };
 
   // =====================================================
-  // MARK SINGLE MESSAGE AS SEEN
+  // MARK ONE SEEN
   // =====================================================
 
   const markMessageSeen = (messageId) => {
     const currentUser =
       currentUserRef.current;
 
-    if (
-      !messageId ||
-      !currentUser
-    ) {
+    if (!messageId || !currentUser) {
       return;
     }
 
     socket.emit(
       "mark_message_seen",
       {
-        messageId: messageId,
+        messageId,
         receiver: String(
           currentUser.id
         ),
@@ -340,7 +336,7 @@ function App() {
       }
 
       const response = await fetch(
-        `https://chatflow-server-xpor.onrender.com/api/messages/${userId}`,
+        `${SERVER_URL}/api/messages/${userId}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -366,18 +362,10 @@ function App() {
         loadedMessages
       );
 
-      // =================================================
-      // MARK INCOMING MESSAGES AS SEEN
-      // =================================================
-
       markAllMessagesSeen(
         String(userId),
         String(currentUser.id)
       );
-
-      // =================================================
-      // CLEAR UNREAD COUNT
-      // =================================================
 
       setUnreadCounts(
         (previous) => ({
@@ -414,10 +402,8 @@ function App() {
       formattedUser;
 
     setMessages([]);
-
     setIsTyping(false);
 
-    // Clear unread count
     setUnreadCounts(
       (previous) => ({
         ...previous,
@@ -453,15 +439,20 @@ function App() {
       return;
     }
 
+    if (!socket.connected) {
+      alert(
+        "Socket is not connected. Please wait a moment and try again."
+      );
+      return;
+    }
+
     const messageData = {
       sender: String(
         currentUser.id
       ),
-
       receiver: String(
         selectedUser.id
       ),
-
       message:
         message.trim(),
     };
@@ -482,7 +473,6 @@ function App() {
         sender: String(
           currentUser.id
         ),
-
         receiver: String(
           selectedUser.id
         ),
@@ -519,38 +509,32 @@ function App() {
 
     if (
       !currentUser ||
-      !selectedUser
+      !selectedUser ||
+      !socket.connected
     ) {
       return;
     }
+
+    const typingData = {
+      sender: String(
+        currentUser.id
+      ),
+      receiver: String(
+        selectedUser.id
+      ),
+    };
 
     if (
       value.trim().length > 0
     ) {
       socket.emit(
         "typing",
-        {
-          sender: String(
-            currentUser.id
-          ),
-
-          receiver: String(
-            selectedUser.id
-          ),
-        }
+        typingData
       );
     } else {
       socket.emit(
         "stop_typing",
-        {
-          sender: String(
-            currentUser.id
-          ),
-
-          receiver: String(
-            selectedUser.id
-          ),
-        }
+        typingData
       );
     }
 
@@ -566,15 +550,7 @@ function App() {
       setTimeout(() => {
         socket.emit(
           "stop_typing",
-          {
-            sender: String(
-              currentUser.id
-            ),
-
-            receiver: String(
-              selectedUser.id
-            ),
-          }
+          typingData
         );
       }, 1200);
   };
@@ -597,10 +573,6 @@ function App() {
   useEffect(() => {
     if (!loggedIn) return;
 
-    // ---------------------------------------------------
-    // CONNECT
-    // ---------------------------------------------------
-
     const handleConnect = () => {
       setConnected(true);
 
@@ -619,10 +591,6 @@ function App() {
       }
     };
 
-    // ---------------------------------------------------
-    // DISCONNECT
-    // ---------------------------------------------------
-
     const handleDisconnect = () => {
       setConnected(false);
 
@@ -630,10 +598,6 @@ function App() {
         "🔴 Socket disconnected"
       );
     };
-
-    // ---------------------------------------------------
-    // ONLINE USERS
-    // ---------------------------------------------------
 
     const handleOnlineUsers = (
       userIds
@@ -645,9 +609,9 @@ function App() {
       );
     };
 
-    // ---------------------------------------------------
+    // ===================================================
     // RECEIVE MESSAGE
-    // ---------------------------------------------------
+    // ===================================================
 
     const handleReceiveMessage = (
       data
@@ -671,10 +635,7 @@ function App() {
           currentUser.id
         );
 
-      // =================================================
-      // MESSAGE FROM SOMEONE ELSE
-      // =================================================
-
+      // Incoming message
       if (
         senderId !==
         currentUserId
@@ -685,28 +646,16 @@ function App() {
             selectedUser.id
           ) === senderId;
 
-        // =================================================
-        // CURRENTLY OPEN CHAT
-        // =================================================
-
         if (isSelectedChat) {
-          // Receiver is currently looking at chat
-          // So immediately mark this message as seen
-
           if (data._id) {
             markMessageSeen(
               data._id
             );
           }
         } else {
-          // =================================================
-          // UNREAD MESSAGE
-          // =================================================
-
           setUnreadCounts(
             (previous) => ({
               ...previous,
-
               [senderId]:
                 (previous[
                   senderId
@@ -714,7 +663,6 @@ function App() {
             })
           );
 
-          // Browser notification
           if (
             document.hidden &&
             "Notification" in
@@ -732,10 +680,6 @@ function App() {
           }
         }
       }
-
-      // =================================================
-      // CURRENT CHAT
-      // =================================================
 
       if (!selectedUser) {
         return;
@@ -794,7 +738,10 @@ function App() {
     const handleMessageSeen = (
       data
     ) => {
-      if (!data || !data.messageId) {
+      if (
+        !data ||
+        !data.messageId
+      ) {
         return;
       }
 
@@ -857,9 +804,6 @@ function App() {
                   msg.receiver
                 );
 
-              // Only update messages
-              // belonging to this direction
-
               if (
                 msgSender ===
                   senderId &&
@@ -877,7 +821,6 @@ function App() {
           )
       );
 
-      // Clear unread count
       if (
         currentUserRef.current &&
         receiverId ===
@@ -894,9 +837,9 @@ function App() {
       }
     };
 
-    // ---------------------------------------------------
-    // USER TYPING
-    // ---------------------------------------------------
+    // ===================================================
+    // TYPING
+    // ===================================================
 
     const handleUserTyping = (
       data
@@ -930,20 +873,19 @@ function App() {
           selectedUser.id
         );
 
-      const isCurrentChat =
+      if (
         senderId ===
           selectedUserId &&
         receiverId ===
-          currentUserId;
-
-      if (isCurrentChat) {
+          currentUserId
+      ) {
         setIsTyping(true);
       }
     };
 
-    // ---------------------------------------------------
+    // ===================================================
     // STOP TYPING
-    // ---------------------------------------------------
+    // ===================================================
 
     const handleUserStopTyping = (
       data
@@ -977,19 +919,18 @@ function App() {
           selectedUser.id
         );
 
-      const isCurrentChat =
+      if (
         senderId ===
           selectedUserId &&
         receiverId ===
-          currentUserId;
-
-      if (isCurrentChat) {
+          currentUserId
+      ) {
         setIsTyping(false);
       }
     };
 
     // ===================================================
-    // SOCKET LISTENERS
+    // LISTENERS
     // ===================================================
 
     socket.on(
@@ -1032,14 +973,9 @@ function App() {
       handleUserStopTyping
     );
 
-    // Already connected
     if (socket.connected) {
       setConnected(true);
     }
-
-    // ===================================================
-    // CLEANUP
-    // ===================================================
 
     return () => {
       socket.off(
@@ -1085,7 +1021,7 @@ function App() {
   }, [loggedIn]);
 
   // =====================================================
-  // NOTIFICATION PERMISSION
+  // NOTIFICATIONS
   // =====================================================
 
   useEffect(() => {
@@ -1105,15 +1041,10 @@ function App() {
   // =====================================================
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView(
-      {
-        behavior: "smooth",
-      }
-    );
-  }, [
-    messages,
-    isTyping,
-  ]);
+    messagesEndRef.current?.scrollIntoView({
+      behavior: "smooth",
+    });
+  }, [messages, isTyping]);
 
   // =====================================================
   // LOGOUT
@@ -1126,10 +1057,10 @@ function App() {
     const selectedUser =
       selectedUserRef.current;
 
-    // Stop typing
     if (
       currentUser &&
-      selectedUser
+      selectedUser &&
+      socket.connected
     ) {
       socket.emit(
         "stop_typing",
@@ -1137,7 +1068,6 @@ function App() {
           sender: String(
             currentUser.id
           ),
-
           receiver: String(
             selectedUser.id
           ),
@@ -1145,8 +1075,10 @@ function App() {
       );
     }
 
-    // Tell server user is offline
-    if (currentUser) {
+    if (
+      currentUser &&
+      socket.connected
+    ) {
       socket.emit(
         "user_offline",
         currentUser.id
@@ -1166,6 +1098,7 @@ function App() {
     setIsTyping(false);
     setUnreadCounts({});
     setOnlineUsers([]);
+    setConnected(false);
 
     currentUserRef.current =
       null;
@@ -1304,8 +1237,6 @@ function App() {
 
       <aside className="side-panel">
 
-        {/* BRAND */}
-
         <div className="brand">
 
           <div className="brand-mark">
@@ -1323,8 +1254,6 @@ function App() {
           </div>
 
         </div>
-
-        {/* PROFILE */}
 
         <div className="profile-box">
 
@@ -1351,8 +1280,6 @@ function App() {
 
         </div>
 
-        {/* PEOPLE TITLE */}
-
         <div className="people-title">
 
           <span>
@@ -1364,8 +1291,6 @@ function App() {
           </b>
 
         </div>
-
-        {/* PEOPLE LIST */}
 
         <div className="people-list">
 
@@ -1409,8 +1334,6 @@ function App() {
                     }
                   >
 
-                    {/* AVATAR */}
-
                     <div className="person-avatar">
 
                       {user.name
@@ -1427,8 +1350,6 @@ function App() {
 
                     </div>
 
-                    {/* NAME + EMAIL */}
-
                     <div className="person-text">
 
                       <strong>
@@ -1442,8 +1363,6 @@ function App() {
                       </span>
 
                     </div>
-
-                    {/* RIGHT SIDE */}
 
                     <div className="person-right">
 
@@ -1471,8 +1390,6 @@ function App() {
           )}
 
         </div>
-
-        {/* SIDEBAR BOTTOM */}
 
         <div className="side-bottom">
 
@@ -1537,8 +1454,6 @@ function App() {
 
           <>
 
-            {/* HEADER */}
-
             <header className="conversation-header">
 
               <div className="header-avatar">
@@ -1588,8 +1503,6 @@ function App() {
               </div>
 
             </header>
-
-            {/* MESSAGES */}
 
             <div className="messages">
 
@@ -1669,10 +1582,6 @@ function App() {
                                   )
                                 : ""}
 
-                              {/* =================================
-                                  SEEN STATUS
-                              ================================= */}
-
                               {isMine && (
                                 <span
                                   style={{
@@ -1696,8 +1605,6 @@ function App() {
                       );
                     }
                   )}
-
-                  {/* TYPING INDICATOR */}
 
                   {isTyping && (
 
@@ -1731,8 +1638,6 @@ function App() {
               ></div>
 
             </div>
-
-            {/* COMPOSER */}
 
             <div className="composer">
 

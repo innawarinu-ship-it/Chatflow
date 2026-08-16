@@ -27,15 +27,22 @@ const onlineUsers = new Map();
 // userId -> socketId
 
 // ======================================================
+// ALLOWED FRONTEND ORIGINS
+// ======================================================
+
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:5174",
+  "https://chatflow-frontend-8vu3.onrender.com",
+];
+
+// ======================================================
 // SOCKET.IO
 // ======================================================
 
 const io = new Server(server, {
   cors: {
-    origin: [
-      "http://localhost:5173",
-      "http://localhost:5174",
-    ],
+    origin: allowedOrigins,
     methods: ["GET", "POST"],
     credentials: true,
   },
@@ -47,10 +54,7 @@ const io = new Server(server, {
 
 app.use(
   cors({
-    origin: [
-      "http://localhost:5173",
-      "http://localhost:5174",
-    ],
+    origin: allowedOrigins,
     credentials: true,
   })
 );
@@ -219,8 +223,6 @@ io.on("connection", (socket) => {
           return;
         }
 
-        // Save new message
-        // New messages start as unseen
         const newMessage =
           await Message.create({
             sender,
@@ -235,7 +237,6 @@ io.on("connection", (socket) => {
           newMessage._id.toString()
         );
 
-        // Send message to all connected clients
         io.emit(
           "receive_message",
           newMessage
@@ -295,7 +296,6 @@ io.on("connection", (socket) => {
           messageId
         );
 
-        // Tell clients that this message is seen
         io.emit(
           "message_seen",
           {
@@ -363,7 +363,6 @@ io.on("connection", (socket) => {
           result.modifiedCount
         );
 
-        // Notify all clients
         io.emit(
           "all_messages_seen",
           {
