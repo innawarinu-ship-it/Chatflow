@@ -6,12 +6,17 @@ import "./App.css";
 // LIVE BACKEND
 // =====================================================
 
-const SERVER_URL = "https://chatflow-server-xpor.onrender.com";
+const SERVER_URL =
+  "https://chatflow-backend-u6um.onrender.com";
 
 const socket = io(SERVER_URL, {
   autoConnect: true,
   transports: ["websocket", "polling"],
 });
+
+// =====================================================
+// APP
+// =====================================================
 
 function App() {
   // =====================================================
@@ -109,7 +114,9 @@ function App() {
       if (!rawUser) return;
 
       const user = {
-        id: String(rawUser.id || rawUser._id),
+        id: String(
+          rawUser.id || rawUser._id
+        ),
         name: rawUser.name,
         email: rawUser.email,
       };
@@ -118,10 +125,16 @@ function App() {
       currentUserRef.current = user;
 
       if (socket.connected) {
-        socket.emit("user_online", user.id);
+        socket.emit(
+          "user_online",
+          user.id
+        );
       }
     } catch (error) {
-      console.error("Profile error:", error);
+      console.error(
+        "Profile error:",
+        error
+      );
     }
   };
 
@@ -131,7 +144,8 @@ function App() {
 
   const loadUsers = async () => {
     try {
-      const token = localStorage.getItem("token");
+      const token =
+        localStorage.getItem("token");
 
       if (!token) return;
 
@@ -152,19 +166,26 @@ function App() {
         return;
       }
 
-      const data = await response.json();
+      const data =
+        await response.json();
 
-      const formattedUsers = (
-        data.users || []
-      ).map((user) => ({
-        id: String(user.id || user._id),
-        name: user.name,
-        email: user.email,
-      }));
+      const formattedUsers =
+        (data.users || []).map(
+          (user) => ({
+            id: String(
+              user.id || user._id
+            ),
+            name: user.name,
+            email: user.email,
+          })
+        );
 
       setUsers(formattedUsers);
     } catch (error) {
-      console.error("Users error:", error);
+      console.error(
+        "Users error:",
+        error
+      );
     }
   };
 
@@ -191,15 +212,20 @@ function App() {
         };
 
     try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(body),
-      });
+      const response = await fetch(
+        url,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify(body),
+        }
+      );
 
-      const data = await response.json();
+      const data =
+        await response.json();
 
       if (!response.ok) {
         alert(
@@ -213,13 +239,17 @@ function App() {
       // LOGIN SUCCESS
       // =================================================
 
-      if (isLogin && data.token) {
+      if (
+        isLogin &&
+        data.token
+      ) {
         localStorage.setItem(
           "token",
           data.token
         );
 
-        const rawUser = data.user;
+        const rawUser =
+          data.user;
 
         if (rawUser) {
           const user = {
@@ -232,7 +262,8 @@ function App() {
           };
 
           setCurrentUser(user);
-          currentUserRef.current = user;
+          currentUserRef.current =
+            user;
 
           if (socket.connected) {
             socket.emit(
@@ -279,15 +310,22 @@ function App() {
     senderId,
     receiverId
   ) => {
-    if (!senderId || !receiverId) {
+    if (
+      !senderId ||
+      !receiverId
+    ) {
       return;
     }
 
     socket.emit(
       "mark_all_messages_seen",
       {
-        sender: String(senderId),
-        receiver: String(receiverId),
+        sender: String(
+          senderId
+        ),
+        receiver: String(
+          receiverId
+        ),
       }
     );
   };
@@ -296,11 +334,16 @@ function App() {
   // MARK ONE SEEN
   // =====================================================
 
-  const markMessageSeen = (messageId) => {
+  const markMessageSeen = (
+    messageId
+  ) => {
     const currentUser =
       currentUserRef.current;
 
-    if (!messageId || !currentUser) {
+    if (
+      !messageId ||
+      !currentUser
+    ) {
       return;
     }
 
@@ -319,10 +362,14 @@ function App() {
   // LOAD MESSAGES
   // =====================================================
 
-  const loadMessages = async (userId) => {
+  const loadMessages = async (
+    userId
+  ) => {
     try {
       const token =
-        localStorage.getItem("token");
+        localStorage.getItem(
+          "token"
+        );
 
       const currentUser =
         currentUserRef.current;
@@ -385,7 +432,9 @@ function App() {
   // SELECT USER
   // =====================================================
 
-  const selectUser = (user) => {
+  const selectUser = (
+    user
+  ) => {
     const formattedUser = {
       id: String(
         user.id || user._id
@@ -427,7 +476,9 @@ function App() {
     const selectedUser =
       selectedUserRef.current;
 
-    if (!message.trim()) return;
+    if (!message.trim()) {
+      return;
+    }
 
     if (
       !currentUser ||
@@ -495,7 +546,9 @@ function App() {
   // TYPING
   // =====================================================
 
-  const handleTyping = (e) => {
+  const handleTyping = (
+    e
+  ) => {
     const value =
       e.target.value;
 
@@ -591,13 +644,14 @@ function App() {
       }
     };
 
-    const handleDisconnect = () => {
-      setConnected(false);
+    const handleDisconnect =
+      () => {
+        setConnected(false);
 
-      console.log(
-        "🔴 Socket disconnected"
-      );
-    };
+        console.log(
+          "🔴 Socket disconnected"
+        );
+      };
 
     const handleOnlineUsers = (
       userIds
@@ -622,7 +676,9 @@ function App() {
       const selectedUser =
         selectedUserRef.current;
 
-      if (!currentUser) return;
+      if (!currentUser) {
+        return;
+      }
 
       const senderId =
         String(data.sender);
@@ -635,7 +691,6 @@ function App() {
           currentUser.id
         );
 
-      // Incoming message
       if (
         senderId !==
         currentUserId
@@ -1041,9 +1096,11 @@ function App() {
   // =====================================================
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({
-      behavior: "smooth",
-    });
+    messagesEndRef.current?.scrollIntoView(
+      {
+        behavior: "smooth",
+      }
+    );
   }, [messages, isTyping]);
 
   // =====================================================
