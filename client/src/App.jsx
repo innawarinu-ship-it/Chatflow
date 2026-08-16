@@ -1,8 +1,9 @@
+
 import { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import "./App.css";
 
-const socket = io("http://localhost:5000", {
+const socket = io("https://chatflow-19tx.onrender.com", {
   autoConnect: true,
   transports: ["websocket", "polling"],
 });
@@ -80,7 +81,7 @@ function App() {
       if (!token) return;
 
       const response = await fetch(
-        "http://localhost:5000/api/profile",
+        "https://chatflow-19tx.onrender.com/api/profile",
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -131,7 +132,7 @@ function App() {
       if (!token) return;
 
       const response = await fetch(
-        "http://localhost:5000/api/users",
+        "https://chatflow-19tx.onrender.com/api/users",
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -174,8 +175,8 @@ function App() {
     e.preventDefault();
 
     const url = isLogin
-      ? "http://localhost:5000/api/auth/login"
-      : "http://localhost:5000/api/auth/register";
+      ? "https://chatflow-19tx.onrender.com/api/auth/login"
+      : "https://chatflow-19tx.onrender.com/api/auth/register";
 
     const body = isLogin
       ? {
@@ -339,7 +340,7 @@ function App() {
       }
 
       const response = await fetch(
-        `http://localhost:5000/api/messages/${userId}`,
+        `https://chatflow-19tx.onrender.com/api/messages/${userId}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
