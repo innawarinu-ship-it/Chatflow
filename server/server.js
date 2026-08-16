@@ -1,4 +1,3 @@
-
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
@@ -33,7 +32,10 @@ const onlineUsers = new Map();
 
 const io = new Server(server, {
   cors: {
-    origin: ["http://localhost:5173", "http://localhost:5174"],,
+    origin: [
+      "http://localhost:5173",
+      "http://localhost:5174",
+    ],
     methods: ["GET", "POST"],
     credentials: true,
   },
@@ -45,7 +47,10 @@ const io = new Server(server, {
 
 app.use(
   cors({
-    origin: ["http://localhost:5173", "http://localhost:5174"],
+    origin: [
+      "http://localhost:5173",
+      "http://localhost:5174",
+    ],
     credentials: true,
   })
 );
@@ -235,7 +240,6 @@ io.on("connection", (socket) => {
           "receive_message",
           newMessage
         );
-
       } catch (error) {
         console.error(
           "❌ Send message error:",
@@ -311,7 +315,6 @@ io.on("connection", (socket) => {
               ),
           }
         );
-
       } catch (error) {
         console.error(
           "❌ Mark message seen error:",
@@ -371,7 +374,6 @@ io.on("connection", (socket) => {
               String(receiver),
           }
         );
-
       } catch (error) {
         console.error(
           "❌ Mark all messages seen error:",
@@ -409,7 +411,6 @@ io.on("connection", (socket) => {
             ),
           }
         );
-
       } catch (error) {
         console.error(
           "❌ Typing error:",
@@ -447,7 +448,6 @@ io.on("connection", (socket) => {
             ),
           }
         );
-
       } catch (error) {
         console.error(
           "❌ Stop typing error:",
@@ -536,4 +536,3 @@ mongoose
       error
     );
   });
-
